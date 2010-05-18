@@ -6,4 +6,4 @@ from pgwrench import app
 setup(name='pgwrench',
   version=app.version,
   packages=['pgwrench'],
-  scripts=['scripts/pgwrench.py'])
+  scripts=['pgwrench.py'])

@@ -1,7 +1,7 @@
 
 import psycopg2.extras
 
-def list_sequences(db, schema_name = None, table_name = None):
+def list_sequences(db, schema_name = None, table_name = None, problematic_only=True):
   """
   list all sequences
   """
@@ -18,38 +18,54 @@ def list_sequences(db, schema_name = None, table_name = None):
       where
         pad.adsrc ~* $$nextval\(\\'[^\\']*\\'::regclass\)$$"""
 
+
   if schema_name:
-    if type(schema_name).__class__ == "str":
+    if type(schema_name) == str:
       sql += " and  pns.nspname = '%s'" % schema_name
-    if type(schema_name).__class__ == "list":
+    if type(schema_name) == list:
       sql += " and pns.nspname in ('%s')" % "','".join(schema_name)
 
   if table_name:
-    if type(table_name).__class__ == "str":
+    if type(table_name) == str:
       sql += " and  pc.relname = '%s'" % table_name
-    if type(table_name).__class__ == "list":
+    if type(table_name) == list:
       sql += " and pc.relname in ('%s')" % "','".join(table_name)
 
   sql += " order by pns.nspname, pc.relname, pa.attname"
 
   cur.execute(sql)
   sequences = cur.fetchall()
+  seqs=[]
 
   for i in range(len(sequences)):
+    seq = dict(sequences[i])
+    
+    params = seq
+    params['seqfull'] = seq['seq_name']
+    if params['seqfull'].find(".") == -1:
+      params['seqfull'] = seq['schema_name'] + "." + params['seqfull']
+
+
     cur.execute("""
       select seq_last, max_value, seq_last-max_value as seq_offset 
       from ( 
         select seq.last_value as seq_last, (select max(%(column_name)s) from %(schema_name)s.%(table_name)s) as max_value
-        from  %(schema_name)s.%(seq_name)s seq
-      ) foo""" % sequences[i])
+        from  %(seqfull)s seq
+      ) foo""" % params)
 
     seqvals = cur.fetchone()
-    sequences[i].update(seqvals)
+    seq.update(dict(seqvals))
+    if problematic_only:
+      if seq['seq_offset'] not in (None, 0):
+        seqs.append(seq)
+    else:
+      seqs.append(seq)
 
-  return sequences
+
+  return seqs
 
 
-def fix_sequences(db, fix_negative_offset = True, fix_positive_offset=False ,**kwargs):
+def fix_sequences(db, fix_negative_offset = True, fix_positive_offset=True ,**kwargs):
   
   sequences = list_sequences(db, **kwargs)
 
@@ -64,3 +80,5 @@ def fix_sequences(db, fix_negative_offset = True, fix_positive_offset=False ,**k
 
     if fix:
       cur.execute("select setval('%(schema_name)s.%(seq_name)s', %(max_value)d, true)" % seq)
+
+  db.commit()

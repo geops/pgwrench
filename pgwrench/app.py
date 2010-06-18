@@ -7,6 +7,10 @@ import psycopg2
 
 from pgwrench import commands
 
+
+
+version="0.2"
+
 def cmdline_parser():
 
   usage = """

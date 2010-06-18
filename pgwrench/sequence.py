@@ -10,7 +10,7 @@ def list_sequences(db, schema_name = None, table_name = None, problematic_only=T
   sql = """select pns.nspname as schema_name, 
         pc.relname as table_name, 
         pa.attname as column_name, 
-        substring(pad.adsrc, $$nextval\(\\'([^\\']*)\\'::regclass\)$$) as seq_name
+        substring(pg_catalog.pg_get_expr(pad.adbin, pad.adrelid), $$nextval\(\\'([^\\']*)\\'::regclass\)$$) as seq_name
       from pg_catalog.pg_attrdef pad
       join pg_catalog.pg_class pc on pad.adrelid=pc.oid
       join pg_catalog.pg_namespace pns on pns.oid = pc.relnamespace
@@ -44,6 +44,7 @@ def list_sequences(db, schema_name = None, table_name = None, problematic_only=T
     params['seqfull'] = seq['seq_name']
     if params['seqfull'].find(".") == -1:
       params['seqfull'] = seq['schema_name'] + "." + params['seqfull']
+      seq['seq_name'] = params['seqfull']
 
 
     cur.execute("""
@@ -79,6 +80,6 @@ def fix_sequences(db, fix_negative_offset = True, fix_positive_offset=True ,**kw
       fix = True
 
     if fix:
-      cur.execute("select setval('%(schema_name)s.%(seq_name)s', %(max_value)d, true)" % seq)
+      cur.execute("select setval('%(seq_name)s', %(max_value)d, true)" % seq)
 
   db.commit()

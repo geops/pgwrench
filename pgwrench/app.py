@@ -17,8 +17,18 @@ def cmdline_parser():
   usage: %prog [options] command
 
   primarykey sequences:
-    pkseq list
-    pkseq fix-values
+    pkseq find          : list all sequences which are used for default values
+                          where one of the following problems exists:
+                            * the max. value of the column and the current
+                              value of the sequence are off
+                            * the owner of the table and sequence do not match
+
+    pkseq fix-values    : set the current value of the sequence to the
+                          max. value of the table column where it is used
+                          to get the default value.
+
+    pkseq set-acl       : set the permissions of the sequence accoring to the 
+                          permissions of the table.
   """
 
   parser = OptionParser(usage)
@@ -82,13 +92,16 @@ def run():
   if cmd in ("sequences", "seq", "pkseq"):
     if len(args)<2:
       cmdline_err("please specifiy what to do")
-    
+
     subcmd = args[1].lower()
-    if subcmd == "list":
+    if subcmd in ("find", "list"):
       commands.list_sequences(db, options, args)
     elif subcmd in ("fix", "fix-values"):
-      commands.fix_sequences(db, options, args)
-
+      commands.fix_sequences_values(db, options, args)
+    elif subcmd == "set-acl":
+      commands.set_sequences_permissions(db, options, args)
+    else:
+      cmdline_err("unknown subcommand")
 
   else:
-    cmdline_err("unknow command")
+    cmdline_err("unknown command")

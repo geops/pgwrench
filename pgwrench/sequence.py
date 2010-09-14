@@ -1,35 +1,42 @@
 
 import psycopg2.extras
+from pgwrench import acl
 
 def list_sequences(db, schema_name = None, table_name = None, problematic_only=True):
   """
   list all sequences
   """
   cur = db.cursor(cursor_factory=psycopg2.extras.DictCursor)
-
   sql = """select pns.nspname as schema_name,
         pc.relname as table_name,
+        pc.relacl as table_acl,
+        pg_get_userbyid(pc.relowner) as table_owner,
         pa.attname as column_name,
-        substring(pg_catalog.pg_get_expr(pad.adbin, pad.adrelid), $$nextval\(\\'([^\\']*)\\'::regclass\)$$) as seq_name
+        pc2.relname as seq_name,
+        pc2.relacl as seq_acl,
+        pg_get_userbyid(pc2.relowner) as seq_owner
       from pg_catalog.pg_attrdef pad
       join pg_catalog.pg_class pc on pad.adrelid=pc.oid
       join pg_catalog.pg_namespace pns on pns.oid = pc.relnamespace
       join pg_catalog.pg_attribute pa on pa.attrelid = pc.oid and pad.adnum = pa.attnum
-      where
-        pad.adsrc ~* $$nextval\(\\'[^\\']*\\'::regclass\)$$"""
+      join pg_catalog.pg_depend dep on pad.oid = dep.objid
+      join pg_catalog.pg_class pc2 on pc2.oid = dep.refobjid and pc2.relkind='S'"""
 
-
+  wheres=[]
   if schema_name:
     if type(schema_name) == str:
-      sql += " and  pns.nspname = '%s'" % schema_name
+      wheres.append("pns.nspname = '%s'" % schema_name)
     if type(schema_name) == list:
-      sql += " and pns.nspname in ('%s')" % "','".join(schema_name)
+      wheres.append("pns.nspname in ('%s')" % "','".join(schema_name))
 
   if table_name:
     if type(table_name) == str:
-      sql += " and  pc.relname = '%s'" % table_name
+      wheress.append("pc.relname = '%s'" % table_name)
     if type(table_name) == list:
-      sql += " and pc.relname in ('%s')" % "','".join(table_name)
+      wheres.append("pc.relname in ('%s')" % "','".join(table_name))
+
+  if len(wheres)>0:
+    sql += " where " + " and ".join(wheres)
 
   sql += " order by pns.nspname, pc.relname, pa.attname"
 
@@ -39,6 +46,10 @@ def list_sequences(db, schema_name = None, table_name = None, problematic_only=T
 
   for i in range(len(sequences)):
     seq = dict(sequences[i])
+
+    # set the acl objects
+    seq["seq_acl"] = acl.AclDict(seq["seq_acl"])
+    seq["table_acl"] = acl.AclDict(seq["table_acl"])
 
     # get the value of the sequence and the table
     params = seq
@@ -51,16 +62,20 @@ def list_sequences(db, schema_name = None, table_name = None, problematic_only=T
       select seq_last, max_value, seq_last-max_value as seq_offset
       from (
         select seq.last_value as seq_last,
-               (select max(%(column_name)s) from %(schema_name)s.%(table_name)s) as max_value
+               (select coalesce(max(%(column_name)s), 0) from %(schema_name)s.%(table_name)s) as max_value
         from  %(seqfull)s seq
       ) foo""" % params)
 
     seqvals = cur.fetchone()
     seq.update(dict(seqvals))
 
+    # find problems
+    seq["has_acl_mismatch"] = seq["seq_acl"] != acl.seq_acl_from_table(seq["table_acl"])
+    # do not modify sequences of empty tables
+    seq["has_offset"] = seq['seq_offset'] not in (None, 0) and seq["max_value"] != 0
 
     if problematic_only:
-      if seq['seq_offset'] not in (None, 0):
+      if seq["has_offset"] or seq["has_acl_mismatch"]:
         seqs.append(seq)
     else:
       seqs.append(seq)
@@ -69,20 +84,37 @@ def list_sequences(db, schema_name = None, table_name = None, problematic_only=T
   return seqs
 
 
-def fix_sequences(db, fix_negative_offset = True, fix_positive_offset=True ,**kwargs):
-
+def fix_sequences_values(db, fix_negative_offset = True, fix_positive_offset=True ,**kwargs):
   sequences = list_sequences(db, **kwargs)
-
   cur = db.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
   for seq in sequences:
     fix = False
-    if seq["seq_offset"] < 0 and fix_negative_offset:
-      fix = True
-    if seq["seq_offset"] > 0 and fix_positive_offset:
-      fix = True
+    if seq["has_offset"]:
+      if seq["seq_offset"] < 0 and fix_negative_offset:
+        fix = True
+      if seq["seq_offset"] > 0 and fix_positive_offset:
+        fix = True
 
     if fix:
       cur.execute("select setval('%(seq_name)s', %(max_value)d, true)" % seq)
+  db.commit()
+
+
+def set_permissions(db, **kwargs):
+  sequences = list_sequences(db, **kwargs)
+  cur = db.cursor(cursor_factory=psycopg2.extras.DictCursor)
+
+  for seq in sequences:
+    if seq["has_acl_mismatch"]:
+      new_seq_acl = acl.seq_acl_from_table(seq["table_acl"])
+
+      for sql in seq["seq_acl"].revoke("sequence", seq["seq_name"]):
+        print sql
+        cur.execute(sql)
+
+      for sql in new_seq_acl.grant("sequence", seq["seq_name"]):
+        print sql
+        cur.execute(sql)
 
   db.commit()

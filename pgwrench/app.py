@@ -8,26 +8,39 @@ import psycopg2
 from pgwrench import commands
 
 
+version="0.2.1"
 
-version="0.2"
 
 def cmdline_parser():
 
   usage = """
   usage: %prog [options] command
 
-  primarykey sequences:
-    pkseq find          : list all sequences which are used for default values
-                          where one of the following problems exists:
-                            * the max. value of the column and the current
-                              value of the sequence are off
-                            * the owner of the table and sequence do not match
+  primarykey sequences
+  --------------------
+
+    The commands in this section are used on sequences which are set as the
+    default value of a column in a table. This is for example the case with
+    the "serial" datatype.
+
+    pkseq find          : list all sequences where one of the following problems
+                          exists:
+                            - the max. value of the column and the current
+                              value of the sequence are not the same.
+                              This will propably cause foreign key violations when
+                              inserting new rows into this table when the column is used as
+                              primary key.
+                            - the permissions on the table and sequence do not match.
+                              A user might no be able to insert new rows although
+                              the user has the neccessary permissions on the table.
+                              The cause for this are missing permissions on the sequence
+                              to fetch a new primary key.
 
     pkseq fix-values    : set the current value of the sequence to the
                           max. value of the table column where it is used
                           to get the default value.
 
-    pkseq set-acl       : set the permissions of the sequence accoring to the 
+    pkseq set-acl       : set the permissions of the sequence according to the
                           permissions of the table.
   """
 
@@ -41,7 +54,7 @@ def cmdline_parser():
 
   # connection options
   parser.add_option("-H", "--host", dest="host",
-    help="name of db host", metavar="HOSTNAME")
+    help="name of db host", metavar="HOSTNAME")  # -h is reserved for help
   parser.add_option("-d", "--dbname", dest="dbname",
     help="name of database to connect to", metavar="DBNAME")
   parser.add_option("-p", "--port", dest="port",

@@ -3,8 +3,8 @@ from pgwrench import sequence
 
 def list_sequences(db, options, args):
   print "Listing sequences"
-  print 
- 
+  print
+
   opts={}
   if options.schema:
     opts['schema_name']=options.schema
@@ -17,18 +17,20 @@ def list_sequences(db, options, args):
   for seq in seqs:
     if seq['schema_name'] != schema:
       schema = seq['schema_name']
-      print "Schema %s" % schema
-      print
+      print "\nSchema %s\n" % schema
 
-    print "\t%(table_name)s.%(column_name)s\t Sequence: %(seq_name)s" % seq 
-    print "\t\tSeq Value: %(seq_last)d\n\t\tMax Column Value: %(max_value)s\n\t\tOffset: %(seq_offset)s" % seq
-    print 
+    print "  %(table_name)s.%(column_name)s" % seq
+    print "    Sequence name:    %(seq_name)s" % seq
+    print "    Seq Value:        %(seq_last)12d" % seq
+    print "    Max Column Value: %(max_value)12d" % seq
+    print "    Offset:           %(seq_offset)12d" % seq
+    print
 
 
 def fix_sequences(db, options, args):
   print "Fixing sequences"
-  print 
- 
+  print
+
   opts={}
   if options.schema:
     opts['schema_name']=options.schema

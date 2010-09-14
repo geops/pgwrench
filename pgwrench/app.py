@@ -16,10 +16,10 @@ def cmdline_parser():
   usage = """
   usage: %prog [options] command
 
-    sequences list
-    sequences fix
+  primarykey sequences:
+    pkseq list
+    pkseq fix-values
   """
-
 
   parser = OptionParser(usage)
 
@@ -79,14 +79,14 @@ def run():
     sys.exit(1)
 
   cmd = args[0].lower()
-  if cmd == "sequences":
+  if cmd in ("sequences", "seq", "pkseq"):
     if len(args)<2:
       cmdline_err("please specifiy what to do")
     
     subcmd = args[1].lower()
     if subcmd == "list":
       commands.list_sequences(db, options, args)
-    elif subcmd == "fix":
+    elif subcmd in ("fix", "fix-values"):
       commands.fix_sequences(db, options, args)
 
 

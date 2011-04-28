@@ -13,6 +13,7 @@ def list_sequences(db, schema_name = None, table_name = None, problematic_only=T
         pg_get_userbyid(pc.relowner) as table_owner,
         pa.attname as column_name,
         pc2.relname as seq_name,
+        pns2.nspname as seq_schema_name,
         pc2.relacl as seq_acl,
         pg_get_userbyid(pc2.relowner) as seq_owner
       from pg_catalog.pg_attrdef pad
@@ -20,7 +21,8 @@ def list_sequences(db, schema_name = None, table_name = None, problematic_only=T
       join pg_catalog.pg_namespace pns on pns.oid = pc.relnamespace
       join pg_catalog.pg_attribute pa on pa.attrelid = pc.oid and pad.adnum = pa.attnum
       join pg_catalog.pg_depend dep on pad.oid = dep.objid
-      join pg_catalog.pg_class pc2 on pc2.oid = dep.refobjid and pc2.relkind='S'"""
+      join pg_catalog.pg_class pc2 on pc2.oid = dep.refobjid and pc2.relkind='S'
+      join pg_catalog.pg_namespace pns2 on pns2.oid = pc2.relnamespace"""
 
   wheres=[]
   if schema_name:
@@ -55,7 +57,7 @@ def list_sequences(db, schema_name = None, table_name = None, problematic_only=T
     params = seq
     params['seqfull'] = seq['seq_name']
     if params['seqfull'].find(".") == -1:
-      params['seqfull'] = seq['schema_name'] + "." + params['seqfull']
+      params['seqfull'] = seq['seq_schema_name'] + "." + params['seqfull']
       seq['seq_name'] = params['seqfull']
 
     cur.execute("""

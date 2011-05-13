@@ -57,14 +57,14 @@ def list_sequences(db, schema_name = None, table_name = None, problematic_only=T
     params = seq
     params['seqfull'] = seq['seq_name']
     if params['seqfull'].find(".") == -1:
-      params['seqfull'] = seq['seq_schema_name'] + "." + params['seqfull']
+      params['seqfull'] = '"' + seq['seq_schema_name'] + '"."' + params['seqfull'] + '"'
       seq['seq_name'] = params['seqfull']
 
     cur.execute("""
       select seq_last, max_value, seq_last-max_value as seq_offset
       from (
         select seq.last_value as seq_last,
-               (select coalesce(max(%(column_name)s), 0) from %(schema_name)s.%(table_name)s) as max_value
+               (select coalesce(max("%(column_name)s"), 0) from "%(schema_name)s"."%(table_name)s") as max_value
         from  %(seqfull)s seq
       ) foo""" % params)
 

@@ -42,6 +42,13 @@ def cmdline_parser():
 
     pkseq set-acl       : set the permissions of the sequence according to the
                           permissions of the table.
+
+  data handling
+  -------------
+
+    upsert [table1] [...] : create update/insert statements for all rows of the table. The statements
+                            will only insert a row if it does not already exit. if it exists, it will be updated.
+                            only works for tables with a primary key.
   """
 
   parser = OptionParser(usage)
@@ -116,5 +123,7 @@ def run():
     else:
       cmdline_err("unknown subcommand")
 
+  if cmd == "upsert":
+    commands.data_upsert(db, options, args[1:])
   else:
     cmdline_err("unknown command")

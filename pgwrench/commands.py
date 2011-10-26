@@ -1,5 +1,5 @@
 
-from pgwrench import sequence
+from pgwrench import sequence, data
 from pgwrench import acl
 
 def list_sequences(db, options, args):
@@ -60,3 +60,11 @@ def set_sequences_permissions(db, options, args):
 
   sequence.set_permissions(db,**opts)
   print "done"
+
+
+def data_upsert(db, options, args):
+    print "-- creating update/insert statements"
+    print
+
+    data.generate_upserts(db, options, args)
+    print "-- done"

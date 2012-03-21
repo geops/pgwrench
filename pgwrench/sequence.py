@@ -74,7 +74,7 @@ def list_sequences(db, schema_name = None, table_name = None, problematic_only=T
     # find problems
     seq["has_acl_mismatch"] = seq["seq_acl"] != acl.seq_acl_from_table(seq["table_acl"])
     # do not modify sequences of empty tables
-    seq["has_offset"] = seq['seq_offset'] not in (None, 0) and seq["max_value"] != 0
+    seq["has_offset"] = seq['seq_offset'] not in (None, 0) and (seq['seq_last']==1 and seq['max_value']!=0)
 
     if problematic_only:
       if seq["has_offset"] or seq["has_acl_mismatch"]:
@@ -93,13 +93,15 @@ def fix_sequences_values(db, fix_negative_offset = True, fix_positive_offset=Tru
   for seq in sequences:
     fix = False
     if seq["has_offset"]:
+
       if seq["seq_offset"] < 0 and fix_negative_offset:
         fix = True
       if seq["seq_offset"] > 0 and fix_positive_offset:
         fix = True
 
     if fix:
-      cur.execute("select setval('%(seq_name)s', %(max_value)d, true)" % seq)
+      seq_value = seq['max_value'] or 1
+      cur.execute("select setval('%s', %d, true)" % (seq['seq_name'], seq_value))
   db.commit()
 
 

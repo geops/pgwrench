@@ -123,7 +123,7 @@ def run():
     else:
       cmdline_err("unknown subcommand")
 
-  if cmd == "upsert":
+  elif cmd == "upsert":
     commands.data_upsert(db, options, args[1:])
   else:
     cmdline_err("unknown command")
